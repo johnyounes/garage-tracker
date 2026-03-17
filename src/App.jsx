@@ -168,9 +168,23 @@ function parseBuildium(buf){
 }
 
 async function uploadToSupabase(records,filename){
-  await sbFetch("garage_data?uploaded_at=gte.2000-01-01",{method:"DELETE"});
-  for(let i=0;i<records.length;i+=200){
-    await sbFetch("garage_data",{method:"POST",body:JSON.stringify(records.slice(i,i+200))});
+  // Normalize: every record must have EXACTLY these keys in the same order
+  const normalized = records.map(r => ({
+    property:     r.property     ?? null,
+    garage_id:    r.garage_id    ?? null,
+    tenant:       r.tenant       ?? null,
+    unit:         r.unit         ?? null,
+    price:        r.price        ?? null,
+    status:       r.status       ?? "vacant",
+    non_resident: r.non_resident ?? false,
+    notes:        r.notes        ?? null,
+    is_storage:   r.is_storage   ?? false,
+  }));
+  // Delete all existing rows
+  await sbFetch("garage_data?id=gte.0",{method:"DELETE"});
+  // Insert in batches of 100
+  for(let i=0;i<normalized.length;i+=100){
+    await sbFetch("garage_data",{method:"POST",body:JSON.stringify(normalized.slice(i,i+100))});
   }
   await sbFetch("upload_log",{method:"POST",body:JSON.stringify({filename,records_parsed:records.length})});
 }
