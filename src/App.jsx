@@ -1,25 +1,31 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs";
+import * as XLSX from "xlsx";
 
 const SUPA_URL  = "https://isliwfbgftjxaatafhzc.supabase.co";
 const SUPA_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlzbGl3ZmJnZnRqeGFhdGFmaHpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3NzA5NjMsImV4cCI6MjA4OTM0Njk2M30.ZelhESeEbOHOKtqPEH2-gJ0qkZbH6nS8B_N6Z3wTves";
 
 async function sbFetch(path, opts = {}) {
-  const res = await fetch(`${SUPA_URL}/rest/v1/${path}`, {
-    ...opts,
-    headers: {
-      "apikey": SUPA_ANON,
-      "Authorization": `Bearer ${SUPA_ANON}`,
-      "Content-Type": "application/json",
-      "Prefer": "return=minimal",
-      ...(opts.headers || {}),
-    },
-  });
-  if (!res.ok) { const t = await res.text(); throw new Error(`Supabase ${res.status}: ${t}`); }
-  // Handle empty responses (DELETE, some INSERTs with return=minimal)
+  const method = opts.method || "GET";
+  // For writes, use return=minimal so Supabase returns 204 (no body)
+  // For reads, omit Prefer so we get JSON back
+  const isWrite = ["POST","DELETE","PATCH","PUT"].includes(method);
+  const headers = {
+    "apikey": SUPA_ANON,
+    "Authorization": `Bearer ${SUPA_ANON}`,
+    "Content-Type": "application/json",
+    ...(isWrite ? { "Prefer": "return=minimal" } : {}),
+    ...(opts.headers || {}),
+  };
+  const res = await fetch(`${SUPA_URL}/rest/v1/${path}`, { ...opts, headers });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`Supabase ${res.status}: ${t}`);
+  }
+  // 204 No Content or empty body — return null, don't try to parse
+  if (res.status === 204) return null;
   const text = await res.text();
   if (!text || text.trim() === "") return null;
-  try { return JSON.parse(text); } catch { return null; }
+  return JSON.parse(text);
 }
 
 const PROP_MAP = {
