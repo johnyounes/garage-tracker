@@ -40,6 +40,71 @@ const PROP_TOTALS = {
   "Copperleaf":14,"Judee Estates":60,"Maple Park Apartments":38,"Sierra Gardens":23,
   "Stoneybrook Apartments":8,"Tall Oaks":27,"The Preserve":78,"Villa Blanca Apartments":24,
 };
+// Known garage ID lists per property — used to generate vacant slots
+// Any garage ID not found in the uploaded data is shown as vacant
+const PROP_GARAGE_IDS = {
+  "Bancroft Place Apartments": [
+    "G1","G2","G3","G4","G5","G6","G7","G8","G9","G10","G11","G12","G13","G14","G15",
+    "G16","G17","G18","G19","G20","G21","G22","G23","G24","G25","G26","G27","G28","G29","G30",
+    "G31","G32","G33","G34","G35","G36","G37","G38","G39","G40","G41","G42","G43","G44","G45",
+    "G46","G47","G48","G49","G50","G51","G52"
+  ],
+  "Boulder Pointe Townhomes": [
+    "G1","G2","G3","G4","G5","G6","G7","G8","G9","G10","G11","G12","G13","G14","G15","G16",
+    "G17","G18","G19","G20","G21","G22","G23","G24","G25","G26","G27","G28","G29","G30","G31",
+    "G32","G33","G34","G35","G36","G37","G38","G39","G40","G41","G42","G43","G44","G45","G46",
+    "G47","G48","G49","G50","G51","G52","G53","G54","G55","G56","G57","G58","G59","G60","G61",
+    "G62","G63","G64","G65","G66","G67","G68","G69","G70","G71","G72","G73","G74","G75","G76",
+    "G77","G78"
+  ],
+  "Brent Village": [
+    "G1","G2","G3","G4","G5","G6","G7","G8","G9","G10","G11","G12","G13","G14","G15","G16",
+    "G17","G18","G19","G20","G21","G22","G23","G24","G25","G26","G27","G28","G29","G30","G31",
+    "G32","G33","G34","G35","G36","G37","G38","G39","G40","G41","G42","G43","G44","G45","G46",
+    "G47","G48","G49","G50","G51","G52","G53","G54","G55","G56","G57","G58","G59","G60","G61",
+    "G62","G63","G64","G65","G66","G67","G68","G69","G70","G71","G72","G73","G74","G75","G76",
+    "G77","G78","G79","G80","G81","G82","G83","G84","G85","G86","G87"
+  ],
+  "Copperleaf": ["G1","G2","G3","G4","G5","G6","G7","G8","G9","G10","G11","G12","G13","G14"],
+  "Judee Estates": [
+    "G1701-1","G1701-2","G1701-3","G1701-4","G1705-1","G1705-2","G1705-3","G1705-4",
+    ...Array.from({length:52},(_,i)=>`G-V${i+1}`)
+  ],
+  "Maple Park Apartments": [
+    "G1","G2","G3","G4","G5","G6","G7","G7B","G8","G8B","G8C","G9","G9B","G10","G10B",
+    "G11","G11B","G12","G13","G13B","G14","G15","G16","G17","G18","G19","G20","G21",
+    "G22","G23","G24","G25"
+  ],
+  "Sierra Gardens": [
+    "Carport 11","Carport 26","Carport 27","Carport 28","Carport 52","Carport 69","Carport 71",
+    "Carport 82","Carport 83","Carport 88","Carport 136","Carport 138","Carport 139",
+    "Carport 144","Carport 147","Carport 149","Space 36","Space 40","Space 45","Space 51",
+    "Space 72","Space 107","Space 140"
+  ],
+  "Stoneybrook Apartments": ["G-1","G-2","G-3","G-4","G-5","G-6","G-7","G-8"],
+  "Tall Oaks": [
+    "7001-G1","7001-G2","7001-G3","7005-G1","7005-G2","7005-G3","7005-G4","7005-G5","7005-G6",
+    "7009-G1","7009-G2","7009-G3","7009-G4","7009-G5","7009-G6",
+    "7013-G1","7013-G2","7013-G3","7013-G4","7013-G5","7013-G6",
+    "7015-G1","7015-G2","7015-G3","7015-G4","7015-G5","7015-G6"
+  ],
+  "The Preserve": [
+    "Bldg 100-G1","Bldg 100-G2","Bldg 100-G3","Bldg 100-G4","Bldg 100-G5","Bldg 100-G6","Bldg 100-G7","Bldg 100-G8",
+    "Bldg 116-G1","Bldg 116-G2","Bldg 116-G3","Bldg 116-G4","Bldg 116-G5","Bldg 116-G6","Bldg 116-G7","Bldg 116-G8",
+    "Bldg 117-G1","Bldg 117-G2","Bldg 117-G3","Bldg 117-G4","Bldg 117-G5","Bldg 117-G6","Bldg 117-G7","Bldg 117-G8",
+    "Bldg 133-G1","Bldg 133-G2","Bldg 133-G3","Bldg 133-G4","Bldg 133-G5","Bldg 133-G6","Bldg 133-G7","Bldg 133-G8",
+    "Bldg 4009-G1","Bldg 4009-G2","Bldg 4009-G3","Bldg 4009-G4","Bldg 4009-G5","Bldg 4009-G6","Bldg 4009-G7","Bldg 4009-G8",
+    "Bldg 4101-G1","Bldg 4101-G2","Bldg 4101-G3","Bldg 4101-G4","Bldg 4101-G5","Bldg 4101-G6","Bldg 4101-G7","Bldg 4101-G8",
+    "Bldg 4105-G1","Bldg 4105-G2","Bldg 4105-G3","Bldg 4105-G4","Bldg 4105-G5","Bldg 4105-G6","Bldg 4105-G7","Bldg 4105-G8",
+    "Bldg 4201-G1","Bldg 4201-G2","Bldg 4201-G3","Bldg 4201-G4","Bldg 4201-G5","Bldg 4201-G6","Bldg 4201-G7","Bldg 4201-G8",
+    "Bldg 4205-G1","Bldg 4205-G2","Bldg 4205-G3","Bldg 4205-G4","Bldg 4205-G5","Bldg 4205-G6","Bldg 4205-G7","Bldg 4205-G8"
+  ],
+  "Villa Blanca Apartments": [
+    "G1","G2","G3","G4","G5","G6","G7","G8","G9","G10","G11","G12",
+    "G13","G14","G15","G16","G17","G18","G19","G20","G21","G22","G23","G24"
+  ],
+};
+
 const MGMT_HOLDS = [
   {property:"Copperleaf",garage_id:"G1",notes:"Management Hold"},
   {property:"Copperleaf",garage_id:"G13",notes:"Management Hold"},
@@ -164,6 +229,26 @@ function parseBuildium(buf){
     const key=`Stoneybrook Apartments::${s.garage_id}`;
     if(!seen.has(key)){seen.add(key);records.push({property:"Stoneybrook Apartments",...s});}
   }
+  // Generate vacant records for all known garage IDs not found in the upload
+  for (const [prop, ids] of Object.entries(PROP_GARAGE_IDS)) {
+    for (const gid of ids) {
+      const key = `${prop}::${gid}`;
+      if (!seen.has(key)) {
+        records.push({
+          property:     prop,
+          garage_id:    gid,
+          tenant:       null,
+          unit:         null,
+          price:        null,
+          status:       "vacant",
+          non_resident: false,
+          notes:        null,
+          is_storage:   false,
+        });
+      }
+    }
+  }
+
   return records;
 }
 
