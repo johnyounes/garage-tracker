@@ -16,8 +16,10 @@ async function sbFetch(path, opts = {}) {
     },
   });
   if (!res.ok) { const t = await res.text(); throw new Error(`Supabase ${res.status}: ${t}`); }
-  if (res.status === 204) return null;
-  return res.json();
+  // Handle empty responses (DELETE, some INSERTs with return=minimal)
+  const text = await res.text();
+  if (!text || text.trim() === "") return null;
+  try { return JSON.parse(text); } catch { return null; }
 }
 
 const PROP_MAP = {
@@ -160,7 +162,7 @@ function parseBuildium(buf){
 }
 
 async function uploadToSupabase(records,filename){
-  await sbFetch("garage_data?id=gte.0",{method:"DELETE"});
+  await sbFetch("garage_data?uploaded_at=gte.2000-01-01",{method:"DELETE"});
   for(let i=0;i<records.length;i+=200){
     await sbFetch("garage_data",{method:"POST",body:JSON.stringify(records.slice(i,i+200))});
   }
