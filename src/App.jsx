@@ -121,7 +121,34 @@ const STONEYBROOK_STORAGE = [
   {garage_id:"S-3",tenant:"Alfonso Orozco",unit:"2802-2",price:25,status:"occupied",is_storage:true},
   {garage_id:"S-4",tenant:"Rose Alvarez",unit:"2808-1",price:50,status:"occupied",is_storage:true},
 ];
-const NON_RESIDENT_NAMES = ["Rick Scarborough","Thomas Wurtenberger","James Ruth","Becky Robertson","Coleen Bockelmann","Hanson","Sandy Hudspeth","Tim Logan"];
+// Pinned non-resident records — stored permanently in Supabase as pinned=true
+// These are NEVER deleted by daily lease report uploads
+const PINNED_NON_RESIDENTS = [
+  // ── Stoneybrook Apartments ────────────────────────────────────────────
+  { property:"Stoneybrook Apartments", garage_id:"G-4", tenant:"Hanson/Osborn", unit:null, price:55,  non_resident:true, notes:"Non-resident – no lease in Buildium" },
+  { property:"Stoneybrook Apartments", garage_id:"G-6", tenant:"Sandy Hudspeth", unit:null, price:50, non_resident:true, notes:"Non-resident – no lease in Buildium" },
+  { property:"Stoneybrook Apartments", garage_id:"G-8", tenant:"Tim Logan",      unit:null, price:0,  non_resident:true, notes:"Non-resident – $0/mo, no lease in Buildium" },
+  // ── Brent Village ─────────────────────────────────────────────────────
+  { property:"Brent Village", garage_id:"G8", tenant:"Non-resident (unidentified)", unit:null, price:null, non_resident:true, notes:"Non-resident – identity unknown, no lease in Buildium. ⚠ Please identify." },
+  { property:"Brent Village", garage_id:"G9", tenant:"Non-resident (unidentified)", unit:null, price:null, non_resident:true, notes:"Non-resident – identity unknown, no lease in Buildium. ⚠ Please identify." },
+  // ── Villa Blanca ──────────────────────────────────────────────────────
+  { property:"Villa Blanca Apartments", garage_id:"G19", tenant:"Coleen Bockelmann", unit:null, price:50, non_resident:true, notes:"Non-resident · (402) 905-2653 · Codelvintage@gmail.com · 7551 Lawndale Dr Omaha NE 68134" },
+  { property:"Villa Blanca Apartments", garage_id:"G20", tenant:"Coleen Bockelmann", unit:null, price:50, non_resident:true, notes:"Non-resident · (402) 905-2653 · Codelvintage@gmail.com" },
+  { property:"Villa Blanca Apartments", garage_id:"G21", tenant:"Coleen Bockelmann", unit:null, price:50, non_resident:true, notes:"Non-resident · (402) 905-2653 · Codelvintage@gmail.com" },
+  // ── Tall Oaks ─────────────────────────────────────────────────────────
+  { property:"Tall Oaks", garage_id:"7001-G1", tenant:"Becky Robertson",     unit:null, price:100, non_resident:true, notes:"Non-resident · (816) 694-8778 · kcharleygirl20@gmail.com · 8607 NE 98th CT Kansas City MO 64157" },
+  { property:"Tall Oaks", garage_id:"7005-G3", tenant:"Thomas Wurtenberger", unit:null, price:150, non_resident:true, notes:"Non-resident · (913) 544-5758 · wurt56@gmail.com · 4533 Wood Ave Kansas City MO 66102" },
+  { property:"Tall Oaks", garage_id:"7005-G4", tenant:"Thomas Wurtenberger", unit:null, price:150, non_resident:true, notes:"Non-resident · (913) 544-5758 · wurt56@gmail.com" },
+  { property:"Tall Oaks", garage_id:"7009-G1", tenant:"Rick Scarborough",    unit:null, price:75,  non_resident:true, notes:"Non-resident · (816) 651-1911 · debpinkhd@gmail.com · 8404 LaVern Pleasant Valley MO 64068" },
+  { property:"Tall Oaks", garage_id:"7009-G2", tenant:"Rick Scarborough",    unit:null, price:75,  non_resident:true, notes:"Non-resident · (816) 651-1911 · debpinkhd@gmail.com" },
+  { property:"Tall Oaks", garage_id:"7009-G3", tenant:"Rick Scarborough",    unit:null, price:75,  non_resident:true, notes:"Non-resident · (816) 651-1911 · debpinkhd@gmail.com" },
+  { property:"Tall Oaks", garage_id:"7009-G5", tenant:"Rick Scarborough",    unit:null, price:0,   non_resident:true, notes:"Non-resident · free per previous management · (816) 651-1911" },
+  { property:"Tall Oaks", garage_id:"7013-G3", tenant:"Doug Prewitt",        unit:null, price:100, non_resident:true, notes:"Non-resident · moved out 9/30/25 but still has garages · (816) 210-5394 · amp615@gmail.com · ⚠ Verify status" },
+  { property:"Tall Oaks", garage_id:"7013-G4", tenant:"Doug Prewitt",        unit:null, price:70,  non_resident:true, notes:"Non-resident · moved out 9/30/25 · wants to stop use of one garage · (816) 210-5394" },
+  { property:"Tall Oaks", garage_id:"7015-G3", tenant:"James Ruth",          unit:null, price:150, non_resident:true, notes:"Non-resident · (816) 977-0149 · jruthjr@yahoo.com · 7104 N Chas Dr Pleasant Valley MO 64068" },
+];
+
+const NON_RESIDENT_NAMES = ["Rick Scarborough","Thomas Wurtenberger","James Ruth","Becky Robertson","Coleen Bockelmann","Hanson","Sandy Hudspeth","Tim Logan","Doug Prewitt","Non-resident"];
 
 function getProp(desc){ for(const[k,v]of Object.entries(PROP_MAP)){if(String(desc).startsWith(k))return v;}return null; }
 function firstTenant(t){ return t?String(t).split("\n")[0].trim():""; }
@@ -206,6 +233,11 @@ function parseBuildium(buf){
   if(hr===-1)throw new Error("Header row not found");
   const records=[];
   const seen=new Set();
+  // Pre-seed seen set with pinned non-resident garage IDs so they are never
+  // overwritten by the lease report upload or the vacant generation loop
+  for(const p of PINNED_NON_RESIDENTS){
+    seen.add(`${p.property}::${p.garage_id}`);
+  }
   for(let i=hr+1;i<rows.length;i++){
     const[desc,,,,status,,,, tenants,garageRaw]=rows[i];
     if(!desc||String(status)!=="Active")continue;
@@ -254,6 +286,7 @@ function parseBuildium(buf){
 
 async function uploadToSupabase(records,filename){
   // Normalize: every record must have EXACTLY these keys in the same order
+  // pinned=true rows in Supabase are never deleted — they survive every upload
   const normalized = records.map(r => ({
     property:     r.property     ?? null,
     garage_id:    r.garage_id    ?? null,
@@ -264,14 +297,36 @@ async function uploadToSupabase(records,filename){
     non_resident: r.non_resident ?? false,
     notes:        r.notes        ?? null,
     is_storage:   r.is_storage   ?? false,
+    pinned:       false,
   }));
-  // Delete all existing rows
-  await sbFetch("garage_data?id=gte.0",{method:"DELETE"});
+  // Delete only non-pinned rows — pinned non-resident records are preserved
+  await sbFetch("garage_data?pinned=eq.false",{method:"DELETE"});
   // Insert in batches of 100
   for(let i=0;i<normalized.length;i+=100){
     await sbFetch("garage_data",{method:"POST",body:JSON.stringify(normalized.slice(i,i+100))});
   }
   await sbFetch("upload_log",{method:"POST",body:JSON.stringify({filename,records_parsed:records.length})});
+}
+
+async function seedPinnedIfNeeded(){
+  // Check if pinned records already exist
+  const existing = await sbFetch("garage_data?pinned=eq.true&select=id&limit=1");
+  if(existing && existing.length > 0) return; // already seeded
+  // Insert pinned non-resident records for the first time
+  const pinnedRows = PINNED_NON_RESIDENTS.map(r=>({
+    property:     r.property,
+    garage_id:    r.garage_id,
+    tenant:       r.tenant,
+    unit:         r.unit ?? null,
+    price:        r.price ?? null,
+    status:       "occupied",
+    non_resident: true,
+    notes:        r.notes ?? null,
+    is_storage:   false,
+    pinned:       true,
+  }));
+  await sbFetch("garage_data",{method:"POST",body:JSON.stringify(pinnedRows)});
+  console.log(`Seeded ${pinnedRows.length} pinned non-resident records`);
 }
 
 async function fetchFromSupabase(){
@@ -321,7 +376,8 @@ export default function App(){
   const[showUpload,setShowUpload]=useState(false);
 
   useEffect(()=>{
-    fetchFromSupabase()
+    seedPinnedIfNeeded()
+      .then(()=>fetchFromSupabase())
       .then(({garages,lastUpload})=>{setRecords(garages);setLastUpload(lastUpload);})
       .catch(e=>console.error(e))
       .finally(()=>setLoading(false));
