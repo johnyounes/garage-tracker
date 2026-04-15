@@ -344,6 +344,11 @@ async function seedPinnedIfNeeded(){
   if(allPresent) return; // all pinned records already in Supabase
   // Delete existing pinned rows and re-seed with complete list
   await sbFetch("garage_data?pinned=eq.true",{method:"DELETE"});
+  // Also delete any non-pinned (vacant/occupied) rows that conflict with pinned IDs
+  // This prevents duplicate tiles when a pinned record already exists as a vacant slot
+  for(const p of allPinned){
+    await sbFetch(`garage_data?property=eq.${encodeURIComponent(p.property)}&garage_id=eq.${encodeURIComponent(p.garage_id)}&pinned=eq.false`,{method:"DELETE"});
+  }
   // Insert pinned non-resident records for the first time
   const pinnedRows = [...PINNED_NON_RESIDENTS,...PINNED_RESIDENTS].map(r=>({
     property:     r.property,
@@ -352,7 +357,7 @@ async function seedPinnedIfNeeded(){
     unit:         r.unit ?? null,
     price:        r.price ?? null,
     status:       "occupied",
-    non_resident: true,
+    non_resident: r.non_resident ?? false,
     notes:        r.notes ?? null,
     is_storage:   false,
     pinned:       true,
@@ -434,6 +439,7 @@ export default function App(){
       setUploadMsg(`Saving ${parsed.length} records…`);
       await uploadToSupabase(parsed,file.name);
       setUploadMsg("Refreshing…");
+      await seedPinnedIfNeeded();
       const{garages,lastUpload}=await fetchFromSupabase();
       setRecords(garages);setLastUpload(lastUpload);
       setUploadMsg(`✅ Done — ${parsed.length} records loaded`);
