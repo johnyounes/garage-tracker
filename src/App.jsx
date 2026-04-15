@@ -105,6 +105,13 @@ const PROP_GARAGE_IDS = {
   ],
 };
 
+// Pinned resident records — garages correctly occupied but parser can't extract them
+// These survive every upload just like non-residents
+const PINNED_RESIDENTS = [
+  // Leticia-Ann Purvis G12 — "Garage 11 and 12" bare-number format fails in JS
+  { property:"Brent Village", garage_id:"G12", tenant:"Leticia-Ann Purvis", unit:"1502-27", price:85, non_resident:false, notes:"Double garage with G11 ($85/ea)" },
+];
+
 const MGMT_HOLDS = [
   {property:"Copperleaf",garage_id:"G1",notes:"Management Hold"},
   {property:"Copperleaf",garage_id:"G13",notes:"Management Hold"},
@@ -250,9 +257,11 @@ function parseBuildium(buf){
   if(hr===-1)throw new Error("Header row not found");
   const records=[];
   const seen=new Set();
-  // Pre-seed seen set with pinned non-resident garage IDs so they are never
-  // overwritten by the lease report upload or the vacant generation loop
+  // Pre-seed seen set with pinned non-resident AND pinned resident garage IDs
   for(const p of PINNED_NON_RESIDENTS){
+    seen.add(`${p.property}::${p.garage_id}`);
+  }
+  for(const p of PINNED_RESIDENTS){
     seen.add(`${p.property}::${p.garage_id}`);
   }
   for(let i=hr+1;i<rows.length;i++){
@@ -327,10 +336,16 @@ async function uploadToSupabase(records,filename){
 
 async function seedPinnedIfNeeded(){
   // Check if pinned records already exist
-  const existing = await sbFetch("garage_data?pinned=eq.true&select=id&limit=1");
-  if(existing && existing.length > 0) return; // already seeded
+  // Check if all expected pinned records exist (re-seed if any missing)
+  const existing = await sbFetch("garage_data?pinned=eq.true&select=garage_id,property");
+  const existingKeys = new Set((existing||[]).map(r=>`${r.property}::${r.garage_id}`));
+  const allPinned = [...PINNED_NON_RESIDENTS,...PINNED_RESIDENTS];
+  const allPresent = allPinned.every(p=>existingKeys.has(`${p.property}::${p.garage_id}`));
+  if(allPresent) return; // all pinned records already in Supabase
+  // Delete existing pinned rows and re-seed with complete list
+  await sbFetch("garage_data?pinned=eq.true",{method:"DELETE"});
   // Insert pinned non-resident records for the first time
-  const pinnedRows = PINNED_NON_RESIDENTS.map(r=>({
+  const pinnedRows = [...PINNED_NON_RESIDENTS,...PINNED_RESIDENTS].map(r=>({
     property:     r.property,
     garage_id:    r.garage_id,
     tenant:       r.tenant,
