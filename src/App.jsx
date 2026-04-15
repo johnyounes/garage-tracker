@@ -195,10 +195,15 @@ function parseGarage(raw, prop){
     const ids=extractIds(g,prop);
     return(ids.length?ids:["G-included"]).map(id=>({id,price:0,notes:"Included in rent"}));
   }
-  // Villa Blanca "Garage X - $Y and Garage Z - $Y"
-  if(/and\s+[Gg]arage\s+\d+\s*-\s*\$/.test(g)){
+  // Villa Blanca "Garage X - $Y and Garage Z - $Y" — each garage has its OWN price inline
+  // Only fire if EVERY garage mention has its own "-$price" immediately after it
+  if(/[Gg]arage\s+\d+\s*-\s*\$[\d.]/.test(g)){
     const ms=[...g.matchAll(/[Gg]arage\s+(\d+)\s*-\s*\$\s*([\d.]+)/g)];
-    if(ms.length)return ms.map(m=>({id:`G${m[1]}`,price:Math.round(parseFloat(m[2]))}));
+    // Only use this branch if count of matches equals count of garage numbers found
+    const allGarageNums=[...g.matchAll(/[Gg]arage\s+(\d+)/g)];
+    if(ms.length>0&&ms.length===allGarageNums.length){
+      return ms.map(m=>({id:`G${m[1]}`,price:Math.round(parseFloat(m[2]))}));
+    }
   }
   // Per-garage price with /ea or ea.
   const eaM=g.match(/\$\s*([\d.]+)\s*\/?\s*ea/i);
