@@ -185,7 +185,19 @@ function extractIds(g, prop){
   const gs=[...g.matchAll(/\bG(\d+)\b/g)];
   if(gs.length)return gs.map(x=>`G${x[1]}`);
   const ns=[...g.matchAll(/[Gg]arage\s*#?\s*(\d+)/g)];
-  return ns.map(x=>`G${x[1]}`);
+  const baseIds=ns.map(x=>`G${x[1]}`);
+  // Bare-number fallback: catch "Garage 11 and 12" where 2nd number has no "Garage" prefix
+  // Take everything after the last Garage N match, before the first $, find lone numbers
+  const lastNs=ns.length?ns[ns.length-1]:null;
+  if(lastNs){
+    const remainder=g.slice(lastNs.index+lastNs[0].length).split('$')[0];
+    const bareNums=[...remainder.matchAll(/\b(\d{1,2})\b/g)]
+      .map(x=>x[1])
+      .filter(x=>parseInt(x)>=1&&parseInt(x)<=90);
+    const allIds=[...new Set([...baseIds,...bareNums.map(x=>`G${x}`)])];
+    return allIds;
+  }
+  return baseIds;
 }
 
 function parseGarage(raw, prop){
