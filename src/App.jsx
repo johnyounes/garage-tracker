@@ -266,7 +266,7 @@ function parseBuildium(buf){
   }
   for(let i=hr+1;i<rows.length;i++){
     const[desc,,,,status,,,, tenants,garageRaw]=rows[i];
-    if(!desc||String(status)!=="Active")continue;
+    if(!desc||(String(status)!=="Active"&&String(status)!=="Future"))continue;
     const prop=getProp(desc);if(!prop)continue;
     const tenant=firstTenant(tenants),unit=getUnit(desc);
     for(const g of parseGarage(garageRaw,prop)){
@@ -274,8 +274,9 @@ function parseBuildium(buf){
       const key=`${prop}::${g.id}`;
       if(seen.has(key)&&g.id!=="G?")continue;
       seen.add(key);
+      const leaseStatus=String(status)==="Future"?"future":"occupied";
       records.push({property:prop,garage_id:g.id,tenant:tenant||null,unit:unit||null,
-        price:g.price??null,status:"occupied",non_resident:isNonResident(tenant),
+        price:g.price??null,status:leaseStatus,non_resident:isNonResident(tenant),
         notes:g.notes||null,is_storage:false});
     }
   }
@@ -389,13 +390,15 @@ function getStats(recs,prop){
   const total=PROP_TOTALS[prop]||recs.length;
   const occ=recs.filter(r=>r.status==="occupied"&&!r.is_storage).length;
   const mgmt=recs.filter(r=>r.status==="mgmt_hold"&&!r.is_storage).length;
+  const future=recs.filter(r=>r.status==="future"&&!r.is_storage).length;
   const rev=recs.filter(r=>r.price>0).reduce((a,r)=>a+(r.price||0),0);
   const nonRes=recs.filter(r=>r.non_resident).length;
-  return{total,occ,mgmt,vacant:Math.max(0,total-occ-mgmt),rev,nonRes};
+  return{total,occ,mgmt,future,vacant:Math.max(0,total-occ-mgmt-future),rev,nonRes};
 }
-function OccBar({occ,mgmt,total,color}){
+function OccBar({occ,mgmt,future,total,color}){
   return(<div style={{height:5,borderRadius:3,background:"#1e293b",overflow:"hidden",display:"flex"}}>
     <div style={{width:`${total>0?(occ/total)*100:0}%`,background:color||"#22c55e"}}/>
+    <div style={{width:`${total>0?((future||0)/total)*100:0}%`,background:"#0891b2"}}/>
     <div style={{width:`${total>0?(mgmt/total)*100:0}%`,background:"#f59e0b"}}/>
   </div>);
 }
@@ -424,8 +427,9 @@ export default function App(){
   const propNames=Object.keys(COLORS);
   const totals=useMemo(()=>{
     let total=0,occ=0,mgmt=0,rev=0,nonRes=0;
-    propNames.forEach(p=>{const s=getStats(propMap[p]||[],p);total+=s.total;occ+=s.occ;mgmt+=s.mgmt;rev+=s.rev;nonRes+=s.nonRes;});
-    return{total,occ,mgmt,vacant:total-occ-mgmt,rev,nonRes};
+    let future=0;
+    propNames.forEach(p=>{const s=getStats(propMap[p]||[],p);total+=s.total;occ+=s.occ;mgmt+=s.mgmt;rev+=s.rev;nonRes+=s.nonRes;future+=(s.future||0);});
+    return{total,occ,mgmt,future,vacant:total-occ-mgmt-future,rev,nonRes};
   },[propMap]);
   const revenueData=useMemo(()=>propNames.map(p=>({name:p,rev:getStats(propMap[p]||[],p).rev,color:COLORS[p]})).filter(x=>x.rev>0).sort((a,b)=>b.rev-a.rev),[propMap]);
 
@@ -478,7 +482,7 @@ export default function App(){
           </div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-          {[["Total",totals.total,"#94a3b8"],["Occupied",totals.occ,"#22c55e"],["Mgmt Hold",totals.mgmt,"#f59e0b"],["Vacant",totals.vacant,"#f87171"],["Non-Res",totals.nonRes,"#a78bfa"]].map(([l,v,c])=>(
+          {[["Total",totals.total,"#94a3b8"],["Occupied",totals.occ,"#22c55e"],["Future",totals.future||0,"#38bdf8"],["Mgmt Hold",totals.mgmt,"#f59e0b"],["Vacant",totals.vacant,"#f87171"],["Non-Res",totals.nonRes,"#a78bfa"]].map(([l,v,c])=>(
             <div key={l} style={{background:"#0a1628",border:"1px solid #0f1f35",borderRadius:8,padding:"6px 12px",textAlign:"center",minWidth:64}}>
               <div style={{fontSize:16,fontWeight:800,color:c}}>{v}</div>
               <div style={{fontSize:9,color:"#475569",textTransform:"uppercase",letterSpacing:"0.1em"}}>{l}</div>
@@ -509,7 +513,7 @@ export default function App(){
                     <div style={{fontSize:12,fontWeight:800,color:c}}>{pct}%</div>
                     {pf>0&&<div style={{background:"#7c1d1d",color:"#fca5a5",borderRadius:5,padding:"1px 5px",fontSize:9,fontWeight:800}}>⚑{pf}</div>}
                   </div>
-                  <OccBar occ={s.occ} mgmt={s.mgmt} total={s.total} color={c}/>
+                  <OccBar occ={s.occ} mgmt={s.mgmt} future={s.future||0} total={s.total} color={c}/>
                   <div style={{display:"flex",gap:8,marginTop:4,fontSize:9,color:"#475569",justifyContent:"space-between"}}>
                     <span><span style={{color:"#22c55e"}}>{s.occ}</span> occ · {s.vacant} vac · {s.total} tot</span>
                     {s.rev>0&&<span style={{color:"#4ade80",fontWeight:700}}>${s.rev.toLocaleString()}</span>}
@@ -587,9 +591,9 @@ export default function App(){
                   </div>
                   <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                     <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search…" style={{background:"#0a1628",border:"1px solid #0f1f35",borderRadius:7,padding:"6px 10px",color:"#f1f5f9",fontSize:11,width:140,outline:"none"}}/>
-                    {["all","occupied","mgmt_hold","vacant"].map(s=>(
-                      <button key={s} onClick={()=>setFilter(s)} style={{padding:"6px 10px",borderRadius:7,fontSize:10,fontWeight:700,border:"none",cursor:"pointer",background:filter===s?pc:"#0a1628",color:filter===s?"white":"#475569"}}>
-                        {s==="all"?"All":s==="mgmt_hold"?"Mgmt":s.charAt(0).toUpperCase()+s.slice(1)}
+                    {["all","occupied","future","mgmt_hold","vacant"].map(s=>(
+                      <button key={s} onClick={()=>setFilter(s)} style={{padding:"6px 10px",borderRadius:7,fontSize:10,fontWeight:700,border:"none",cursor:"pointer",background:filter===s?(s==="future"?"#0e4429":pc):"#0a1628",color:filter===s?"white":"#475569"}}>
+                        {s==="all"?"All":s==="mgmt_hold"?"Mgmt":s==="future"?"Future":s.charAt(0).toUpperCase()+s.slice(1)}
                       </button>
                     ))}
                   </div>
@@ -622,11 +626,11 @@ export default function App(){
                     <span>■ Vacant {pStats.vacant}</span>
                     <span style={{color:pc,fontWeight:800}}>{pStats.total>0?Math.round(((pStats.occ+pStats.mgmt)/pStats.total)*100):0}% utilized</span>
                   </div>
-                  <OccBar occ={pStats.occ} mgmt={pStats.mgmt} total={pStats.total} color={pc}/>
+                  <OccBar occ={pStats.occ} mgmt={pStats.mgmt} future={pStats.future||0} total={pStats.total} color={pc}/>
                 </div>
 
                 <div style={{display:"flex",gap:12,marginBottom:12,fontSize:9,color:"#475569",flexWrap:"wrap"}}>
-                  {[["#052e16","#16a34a","Resident"],["#1e1333","#7c3aed","★ Non-Resident"],["#1a1000","#d97706","🔧 Mgmt Hold"],["#080f1c","#1e293b","Vacant"],["#1a0f00","#ca8a04","? TBD"]].map(([bg,bdr,label])=>(
+                  {[["#052e16","#16a34a","Resident"],["#0d2d3a","#0891b2","Future Move-in"],["#1e1333","#7c3aed","★ Non-Resident"],["#1a1000","#d97706","🔧 Mgmt Hold"],["#080f1c","#1e293b","Vacant"],["#1a0f00","#ca8a04","? TBD"]].map(([bg,bdr,label])=>(
                     <div key={label} style={{display:"flex",alignItems:"center",gap:4}}>
                       <div style={{width:11,height:11,borderRadius:3,background:bg,border:`1.5px solid ${bdr}`}}/>
                       <span>{label}</span>
@@ -636,18 +640,19 @@ export default function App(){
 
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:7,marginBottom:18}}>
                   {filtered.map((g,idx)=>{
-                    const occ=g.status==="occupied",mgmt=g.status==="mgmt_hold",nr=g.non_resident,tbd=g.garage_id==="G?";
+                    const occ=g.status==="occupied",mgmt=g.status==="mgmt_hold",nr=g.non_resident,tbd=g.garage_id==="G?",fut=g.status==="future";
                     const hasFlag=FLAGS_STATIC.some(f=>f.prop===sel&&f.garage===g.garage_id);
                     const isSel2=selGarage?.id===g.id;
                     return(
                       <div key={`${g.garage_id}-${idx}`} className="gc" onClick={()=>setSelGarage(isSel2?null:g)}
-                        style={{background:tbd?"#1a0f00":nr?"#1e1333":mgmt?"#1a1000":occ?"#052e16":"#080f1c",border:`1.5px solid ${isSel2?pc:tbd?"#ca8a04":nr?"#7c3aed":mgmt?"#d97706":occ?"#16a34a":"#0f1f35"}`,borderRadius:9,padding:"8px 9px",cursor:"pointer",transition:"all .15s",position:"relative"}}>
+                        style={{background:tbd?"#1a0f00":nr?"#1e1333":mgmt?"#1a1000":fut?"#0d2d3a":occ?"#052e16":"#080f1c",border:`1.5px solid ${isSel2?pc:tbd?"#ca8a04":nr?"#7c3aed":mgmt?"#d97706":fut?"#0891b2":occ?"#16a34a":"#0f1f35"}`,borderRadius:9,padding:"8px 9px",cursor:"pointer",transition:"all .15s",position:"relative"}}>
                         {hasFlag&&<div style={{position:"absolute",top:4,right:4,width:6,height:6,borderRadius:"50%",background:"#f97316"}}/>}
                         <div style={{fontSize:9,fontWeight:700,color:"#475569",marginBottom:2,fontFamily:"monospace"}}>{g.garage_id}</div>
-                        <div style={{fontSize:10,fontWeight:600,color:(occ||tbd)?"#f1f5f9":"#334155",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                        <div style={{fontSize:10,fontWeight:600,color:(occ||tbd||fut)?"#f1f5f9":"#334155",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                           {g.status==="vacant"?<span style={{fontStyle:"italic",color:"#1e293b"}}>Vacant</span>
                             :mgmt?<span style={{color:"#fbbf24"}}>🔧 Mgmt</span>
                             :tbd?<span style={{color:"#fde68a"}}>? {g.tenant}</span>
+                            :fut?<><span style={{color:"#38bdf8",fontSize:8,fontWeight:800,marginRight:3}}>FUTURE</span>{g.tenant}</>
                             :<>{nr&&<span style={{color:"#a78bfa"}}>★ </span>}{g.tenant}</>}
                         </div>
                         {g.unit&&<div style={{fontSize:8,color:"#1e3a5f",marginTop:1}}>Unit {g.unit}</div>}
@@ -681,7 +686,7 @@ export default function App(){
                 <div style={{fontWeight:800,fontSize:13,fontFamily:"monospace",color:pc}}>{selGarage.garage_id}</div>
                 <button onClick={()=>setSelGarage(null)} style={{background:"none",border:"none",color:"#475569",cursor:"pointer"}}>✕</button>
               </div>
-              {[["Status",selGarage.status==="occupied"?(selGarage.non_resident?"★ Non-Resident":"Occupied"):selGarage.status==="mgmt_hold"?"🔧 Mgmt Hold":"Vacant"],
+              {[["Status",selGarage.status==="occupied"?(selGarage.non_resident?"★ Non-Resident":"Occupied"):selGarage.status==="mgmt_hold"?"🔧 Mgmt Hold":selGarage.status==="future"?"📅 Future Move-in":"Vacant"],
                 ["Tenant",selGarage.tenant||"—"],["Unit",selGarage.unit||"—"],
                 ["Rate",selGarage.price!=null?(selGarage.price===0?"Free / Included":`$${selGarage.price}/mo`):"—"],
                 ["Notes",selGarage.notes||"—"],
