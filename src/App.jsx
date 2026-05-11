@@ -185,20 +185,24 @@ function extractIds(g, prop){
     const m=g.match(/[Gg]arage\s+G?(\w+)/);
     if(m)return[`G-${m[1]}`];
   }
+  // Maple Park "2600-G4" style — building prefix then G+number
+  if(prop==="Maple Park Apartments"){
+    const m=g.match(/\d{4}-G(\d+)/);if(m)return[`G${m[1]}`];
+  }
   if(prop==="Sierra Gardens"){
     const m=g.match(/[Cc]arport\s+(\d+)/);if(m)return[`Carport ${m[1]}`];
     const m2=g.match(/[Ss]pace\s+(\d+)/);if(m2)return[`Space ${m2[1]}`];
   }
   const gs=[...g.matchAll(/\bG(\d+)\b/g)];
   if(gs.length)return gs.map(x=>`G${x[1]}`);
-  const ns=[...g.matchAll(/[Gg]arage\s*#?\s*(\d+)/g)];
+  const ns=[...g.matchAll(/[Gg][Aa][Rr][Aa][Gg][Ee]\s*#?\s*(\d+)/g)];
   const baseIds=ns.map(x=>`G${x[1]}`);
   // Bare-number fallback: catch "Garage 11 and 12" where 2nd number has no "Garage" prefix
   // Take everything after the last Garage N match, before the first $, find lone numbers
   const lastNs=ns.length?ns[ns.length-1]:null;
   if(lastNs){
     const remainder=g.slice(lastNs.index+lastNs[0].length).split('$')[0];
-    const bareNums=[...remainder.matchAll(/\b(\d{1,2})\b/g)]
+    const bareNums=[...remainder.matchAll(/[&,\s]+(?:and\s*)?(\d{1,2})\b/gi)]
       .map(x=>x[1])
       .filter(x=>parseInt(x)>=1&&parseInt(x)<=90);
     const allIds=[...new Set([...baseIds,...bareNums.map(x=>`G${x}`)])];
@@ -210,7 +214,7 @@ function extractIds(g, prop){
 function parseGarage(raw, prop){
   if(!raw||String(raw).trim()===""||String(raw).toLowerCase()==="none")return[];
   const g=String(raw).trim();
-  if(/included|not in lease|not charged/i.test(g)){
+  if(/\d+not\s+in|not in lease|not charged|included/i.test(g)){
     const ids=extractIds(g,prop);
     return(ids.length?ids:["G-included"]).map(id=>({id,price:0,notes:"Included in rent"}));
   }
