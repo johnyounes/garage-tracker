@@ -34,11 +34,15 @@ const PROP_MAP = {
   "Maple Park":"Maple Park Apartments","Sierra Gardens":"Sierra Gardens",
   "Stoneybrook":"Stoneybrook Apartments","Tall Oaks":"Tall Oaks",
   "The Preserve":"The Preserve","Villa Blanca":"Villa Blanca Apartments",
+  "Eagle Creek":"Eagle Creek Apartments",
+  "The Enclave":"The Enclave Townhomes",
 };
 const PROP_TOTALS = {
   "Bancroft Place Apartments":52,"Boulder Pointe Townhomes":78,"Brent Village":87,
   "Copperleaf":14,"Judee Estates":60,"Maple Park Apartments":38,"Sierra Gardens":23,
   "Stoneybrook Apartments":8,"Tall Oaks":27,"The Preserve":78,"Villa Blanca Apartments":24,
+  "Eagle Creek Apartments":68,
+  "The Enclave Townhomes":15,
 };
 // Known garage ID lists per property — used to generate vacant slots
 // Any garage ID not found in the uploaded data is shown as vacant
@@ -102,6 +106,16 @@ const PROP_GARAGE_IDS = {
   "Villa Blanca Apartments": [
     "G1","G2","G3","G4","G5","G6","G7","G8","G9","G10","G11","G12",
     "G13","G14","G15","G16","G17","G18","G19","G20","G21","G22","G23","G24"
+  ],
+  "Eagle Creek Apartments": [
+    "G1","G2","G3","G4","G5","G6","G7","G8","G9","G10","G11","G12","G13","G14","G15",
+    "G16","G17","G18","G19","G20","G21","G22","G23","G24","G25","G26","G27","G28","G29","G30",
+    "G31","G32","G33","G34","G35","G36","G37","G38","G39","G40","G41","G42","G43","G44","G45",
+    "G46","G47","G48","G49","G50","G51","G52","G53","G54","G55","G56","G57","G58","G59","G60",
+    "G61","G62","G63","G64","G65","G66","G67","G68"
+  ],
+  "The Enclave Townhomes": [
+    "G1","G2","G3","G4","G5","G6","G7","G8","G9","G10","G11","G12","G13","G14","G15"
   ],
 };
 
@@ -188,6 +202,26 @@ function extractIds(g, prop){
   // Maple Park "2600-G4" style — building prefix then G+number
   if(prop==="Maple Park Apartments"){
     const m=g.match(/\d{4}-G(\d+)/);if(m)return[`G${m[1]}`];
+  }
+  // Eagle Creek: handles garage6 (no space), Garage #20, Garage - #26, G17
+  if(prop==="Eagle Creek Apartments"){
+    // "G17", "G19", "G11" — bare G-prefix
+    const gp=[...g.matchAll(/\bG(\d+)\b/g)].map(x=>x[1]);
+    if(gp.length)return gp.map(x=>`G${x}`);
+    // "Garage #20", "Garage - #26", "garage16", "garage 1"
+    const gn=[...g.matchAll(/[Gg]arage\s*[-#\s]*\s*(\d+)/g)].map(x=>x[1]);
+    if(gn.length)return gn.map(x=>`G${x}`);
+  }
+  // The Enclave: G3, G6, G15 (bare G-prefix), TH #1 (townhome style)
+  if(prop==="The Enclave Townhomes"){
+    // "G3", "G6", "G15"
+    const gp=[...g.matchAll(/\bG(\d+)\b/g)].map(x=>x[1]);
+    if(gp.length)return gp.map(x=>`G${x}`);
+    // "TH #1" — townhome garage
+    const th=g.match(/TH\s*#?(\d+)/i);if(th)return[`G${th[1]}`];
+    // Standard "Garage N"
+    const gn=[...g.matchAll(/[Gg]arage\s*#?\s*(\d+)/g)].map(x=>x[1]);
+    if(gn.length)return gn.map(x=>`G${x}`);
   }
   if(prop==="Sierra Gardens"){
     const m=g.match(/[Cc]arport\s+(\d+)/);if(m)return[`Carport ${m[1]}`];
@@ -379,7 +413,7 @@ async function fetchFromSupabase(){
   return{garages:garages||[],lastUpload:logs?.[0]||null};
 }
 
-const COLORS={"Bancroft Place Apartments":"#e63946","Boulder Pointe Townhomes":"#7209b7","Brent Village":"#f72585","Copperleaf":"#fb8500","Judee Estates":"#06d6a0","Maple Park Apartments":"#f4d35e","Sierra Gardens":"#0096c7","Stoneybrook Apartments":"#80b918","Tall Oaks":"#9b5de5","The Preserve":"#f4a261","Villa Blanca Apartments":"#4cc9f0"};
+const COLORS={"Bancroft Place Apartments":"#e63946","Boulder Pointe Townhomes":"#7209b7","Brent Village":"#f72585","Copperleaf":"#fb8500","Judee Estates":"#06d6a0","Maple Park Apartments":"#f4d35e","Sierra Gardens":"#0096c7","Stoneybrook Apartments":"#80b918","Tall Oaks":"#9b5de5","The Preserve":"#f4a261","Villa Blanca Apartments":"#4cc9f0","Eagle Creek Apartments":"#ef4444","The Enclave Townhomes":"#10b981"};
 const FLAGS_STATIC=[
   {prop:"Brent Village",garage:"G8",msg:"G8 & G9: Non-resident tenants still unidentified."},
   {prop:"Brent Village",garage:"G9",msg:"G8 & G9: Non-resident tenants still unidentified."},
