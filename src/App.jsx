@@ -186,10 +186,37 @@ function extractIds(g, prop){
     if(m3.length)return m3.map(x=>x[1]);
   }
   if(prop==="The Preserve"){
-    const m=[...g.matchAll(/[Bb]ldg\s+([^\s-]+)\s*[-–]\s*G(\w+)/g)];
-    if(m.length)return m.map(x=>`Bldg ${x[1]}-G${x[2]}`);
-    const m2=[...g.matchAll(/[Bb]ldg\s+(\w+-G\w+)/g)];
-    if(m2.length)return m2.map(x=>`Bldg ${x[1]}`);
+    const results=[];
+    // Split on "/" to handle multiple garages: "Bldg 117-G2 / Bldg 117-G8"
+    const parts=g.split(/\s*\/\s*/);
+    for(const part of parts){
+      const p=part.trim();
+      // "G 4009-2" — reversed format: G then building-garage
+      const rev=p.match(/^G\s+(\d+)-(\d+)/);
+      if(rev){results.push(`Bldg ${rev[1]}-G${rev[2]}`);continue;}
+      // "G133-G1", "G133-G2" — G prefix on building number
+      const gprefix=p.match(/^G(\d+)-G(\d+)/);
+      if(gprefix){results.push(`Bldg ${gprefix[1]}-G${gprefix[2]}`);continue;}
+      // "100-G5" — building number then G (no Bldg word)
+      const noBldg=p.match(/^(\d+)-G(\d+)/);
+      if(noBldg){results.push(`Bldg ${noBldg[1]}-G${noBldg[2]}`);continue;}
+      // "Bldg 4101-1 - G3" — unit number embedded: strip middle part
+      const withUnit=p.match(/[Bb][Ll][Dd][Gg]\s+(\d+)-\d+\s*[-–]\s*G(\d+)/);
+      if(withUnit){results.push(`Bldg ${withUnit[1]}-G${withUnit[2]}`);continue;}
+      // "BLDG 166 - G2" — all caps, possible typo building number (166 → 116)
+      // "Bldg 4009 - G2", "BLDG 116 - G3" — standard with spaces
+      const std=p.match(/[Bb][Ll][Dd][Gg]\s+(\d+)\s*[-–]\s*G(\d+)/);
+      if(std){
+        let bldg=std[1];
+        // Fix known typo: 166 → 116
+        if(bldg==="166")bldg="116";
+        results.push(`Bldg ${bldg}-G${std[2]}`);continue;
+      }
+      // "Bldg 4009-G5" compact (no spaces around dash)
+      const compact=p.match(/[Bb][Ll][Dd][Gg]\s+(\d+)-G(\d+)/);
+      if(compact){results.push(`Bldg ${compact[1]}-G${compact[2]}`);continue;}
+    }
+    if(results.length)return results;
   }
   if(prop==="Judee Estates"){
     const m=[...g.matchAll(/[Gg]arage[:\s]+(\d+-\d+)/g)];
