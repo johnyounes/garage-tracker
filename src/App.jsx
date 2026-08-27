@@ -36,6 +36,7 @@ const PROP_MAP = {
   "The Preserve":"The Preserve","Villa Blanca":"Villa Blanca Apartments",
   "Eagle Creek":"Eagle Creek Apartments",
   "The Enclave":"The Enclave Townhomes",
+  "1003-1005 Avenue K":"1003-1005 Avenue K",
 };
 const PROP_TOTALS = {
   "Bancroft Place Apartments":52,"Boulder Pointe Townhomes":78,"Brent Village":87,
@@ -43,6 +44,7 @@ const PROP_TOTALS = {
   "Stoneybrook Apartments":8,"Tall Oaks":27,"The Preserve":78,"Villa Blanca Apartments":24,
   "Eagle Creek Apartments":68,
   "The Enclave Townhomes":15,
+  "1003-1005 Avenue K":11,
 };
 // Known garage ID lists per property — used to generate vacant slots
 // Any garage ID not found in the uploaded data is shown as vacant
@@ -116,6 +118,9 @@ const PROP_GARAGE_IDS = {
   ],
   "The Enclave Townhomes": [
     "G1","G2","G3","G4","G5","G6","G7","G8","G9","G10","G11","G12","G13","G14","G15"
+  ],
+  "1003-1005 Avenue K": [
+    "G1","G2","G3","G4","G5","G6","G7","G8","G9","G10","G11"
   ],
 };
 
@@ -440,7 +445,7 @@ async function fetchFromSupabase(){
   return{garages:garages||[],lastUpload:logs?.[0]||null};
 }
 
-const COLORS={"Bancroft Place Apartments":"#e63946","Boulder Pointe Townhomes":"#7209b7","Brent Village":"#f72585","Copperleaf":"#fb8500","Judee Estates":"#06d6a0","Maple Park Apartments":"#f4d35e","Sierra Gardens":"#0096c7","Stoneybrook Apartments":"#80b918","Tall Oaks":"#9b5de5","The Preserve":"#f4a261","Villa Blanca Apartments":"#4cc9f0","Eagle Creek Apartments":"#ef4444","The Enclave Townhomes":"#10b981"};
+const COLORS={"Bancroft Place Apartments":"#e63946","Boulder Pointe Townhomes":"#7209b7","Brent Village":"#f72585","Copperleaf":"#fb8500","Judee Estates":"#06d6a0","Maple Park Apartments":"#f4d35e","Sierra Gardens":"#0096c7","Stoneybrook Apartments":"#80b918","Tall Oaks":"#9b5de5","The Preserve":"#f4a261","Villa Blanca Apartments":"#4cc9f0","Eagle Creek Apartments":"#ef4444","The Enclave Townhomes":"#10b981","1003-1005 Avenue K":"#f59e0b"};
 const FLAGS_STATIC=[
   {prop:"Brent Village",garage:"G8",msg:"G8 & G9: Non-resident tenants still unidentified."},
   {prop:"Brent Village",garage:"G9",msg:"G8 & G9: Non-resident tenants still unidentified."},
